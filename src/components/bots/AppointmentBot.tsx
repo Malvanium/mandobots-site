@@ -1,7 +1,13 @@
+// src/components/bots/AppointmentBot.tsx
 import React, { useState } from "react";
 
-const AppointmentBot = () => {
-  const [messages, setMessages] = useState([
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
+
+const AppointmentBot: React.FC = () => {
+  const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
       content:
@@ -10,15 +16,22 @@ const AppointmentBot = () => {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [formStage, setFormStage] = useState<"idle" | "name" | "contact" | "time" | "done">("idle");
-  const [formData, setFormData] = useState({ name: "", contact: "", time: "" });
+  const [formStage, setFormStage] = useState<
+    "idle" | "name" | "contact" | "time" | "done"
+  >("idle");
+  const [formData, setFormData] = useState({
+    name: "",
+    contact: "",
+    time: "",
+  });
 
-  const FORMSPREE_ENDPOINT = "https://formspree.io/f/yourformid"; // Replace with your actual form ID
+  // ← UPDATED: pull real URL from your .env
+  const FORMSPREE_ENDPOINT = process.env.REACT_APP_FORM_ENDPOINT!;
 
   const handleSend = async () => {
     if (!input.trim()) return;
 
-    const userMsg = { role: "user", content: input };
+    const userMsg: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
 
@@ -28,7 +41,10 @@ const AppointmentBot = () => {
         setFormStage("contact");
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: "Got it. What's your phone number or email?" },
+          {
+            role: "assistant",
+            content: "Got it. What's your phone number or email?",
+          },
         ]);
       } else if (formStage === "contact") {
         setFormData((prev) => ({ ...prev, contact: input }));
@@ -40,7 +56,8 @@ const AppointmentBot = () => {
       } else if (formStage === "time") {
         const fullData = { ...formData, time: input };
 
-        await fetch(FORMSPREE_ENDPOINT, {
+        // ← posts to your real Formspree endpoint now
+        const res = await fetch(FORMSPREE_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -51,15 +68,23 @@ const AppointmentBot = () => {
           }),
         });
 
+        if (!res.ok) throw new Error(`Formspree error ${res.status}`);
+
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: "Thanks! Your appointment request has been sent." },
+          {
+            role: "assistant",
+            content: "Thanks! Your appointment request has been sent.",
+          },
         ]);
         setFormStage("done");
         setFormData({ name: "", contact: "", time: "" });
       } else {
         const normalized = input.toLowerCase();
-        if (normalized.includes("book") || normalized.includes("appointment")) {
+        if (
+          normalized.includes("book") ||
+          normalized.includes("appointment")
+        ) {
           setFormStage("name");
           setMessages((prev) => [
             ...prev,
@@ -68,15 +93,22 @@ const AppointmentBot = () => {
         } else {
           setMessages((prev) => [
             ...prev,
-            { role: "assistant", content: "I'm here to help with appointments. Just say 'book' to begin." },
+            {
+              role: "assistant",
+              content:
+                "I'm here to help with appointments. Just say 'book' to begin.",
+            },
           ]);
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error("Appointment send failed:", err);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Something went wrong while sending the request." },
+        {
+          role: "assistant",
+          content: "Something went wrong while sending the request.",
+        },
       ]);
     } finally {
       setLoading(false);
@@ -93,8 +125,15 @@ const AppointmentBot = () => {
       <div className="flex-1 p-4 overflow-y-auto">
         <div className="space-y-2">
           {messages.map((msg, i) => (
-            <div key={i} className={`text-${msg.role === "user" ? "right" : "left"}`}>
-              <span className="inline-block bg-blue-100 p-2 rounded">{msg.content}</span>
+            <div
+              key={i}
+              className={`text-${
+                msg.role === "user" ? "right" : "left"
+              }`}
+            >
+              <span className="inline-block bg-blue-100 p-2 rounded">
+                {msg.content}
+              </span>
             </div>
           ))}
           {loading && <p className="italic text-sm">Bot is typing...</p>}
