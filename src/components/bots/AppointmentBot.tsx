@@ -26,7 +26,7 @@ const AppointmentBot: React.FC = () => {
   });
 
   // ← UPDATED: pull real URL from your .env
-  const FORMSPREE_ENDPOINT = process.env.REACT_APP_FORM_ENDPOINT!;
+  const FORMSPREE_ENDPOINT = "https://formspree.io/f/xnndvdar";
 
   const handleSend = async () => {
     if (!input.trim()) return;

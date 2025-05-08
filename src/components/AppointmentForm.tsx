@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 
-const FORM_ENDPOINT = process.env.REACT_APP_FORM_ENDPOINT!; 
-// e.g. a Formspree URL: "https://formspree.io/f/XXXXXXXX"
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/xnndvdar";
 
 export default function AppointmentForm() {
   const [form, setForm] = useState({
