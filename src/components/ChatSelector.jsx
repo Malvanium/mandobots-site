@@ -1,9 +1,10 @@
 // src/components/ChatSelector.jsx
 import React, { useState } from "react";
-import { bots } from "../data/bots";
+import bots from "../data/bots"; // ✅ FIXED: default import
 import ChatBot from "../ChatBot";
 import AppointmentBot from "./bots/AppointmentBot";
-import RealEstateBot from "./bots/RealEstateBot";          // <- correct path
+import RealEstateBot from "./bots/RealEstateBot";
+import LexBot from "./bots/LexBot";
 
 export default function ChatSelector() {
   const [active, setActive] = useState(bots[0]);
@@ -27,10 +28,11 @@ export default function ChatSelector() {
         ))}
       </div>
 
-      {/* render correct component */}
+      {/* bot router */}
       {active.key === "appointment" && <AppointmentBot />}
-      {active.key === "real-estate" && <RealEstateBot />}
-      {active.key !== "appointment" && active.key !== "real-estate" && (
+      {active.key === "realestate" && <RealEstateBot />} {/* ✅ match .key in bots.js */}
+      {active.key === "legal" && <LexBot />}
+      {["appointment", "realestate", "legal"].includes(active.key) === false && (
         <ChatBot
           botName={active.name}
           prompt={active.prompt}
