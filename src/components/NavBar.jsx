@@ -7,6 +7,7 @@ const NavBar = () => {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
 
+  // Top‑level nav items only. Individual demo bots are linked from /demos
   const links = [
     { to: "/", label: "Home" },
     { to: "/demos", label: "Demos" },

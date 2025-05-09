@@ -1,10 +1,7 @@
 // src/components/bots/AppointmentBot.tsx
 import React, { useState } from "react";
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
+type Message = { role: "user" | "assistant"; content: string };
 
 const AppointmentBot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -14,23 +11,22 @@ const AppointmentBot: React.FC = () => {
         "Hi! I'm here to help you book an appointment. Just let me know what you need.",
     },
   ]);
+
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [formStage, setFormStage] = useState<
     "idle" | "name" | "contact" | "time" | "done"
   >("idle");
-  const [formData, setFormData] = useState({
-    name: "",
-    contact: "",
-    time: "",
-  });
+  const [formData, setFormData] = useState({ name: "", contact: "", time: "" });
 
-  // ← UPDATED: pull real URL from your .env
-  const FORMSPREE_ENDPOINT = "https://formspree.io/f/xnndvdar";
+  // Formspree endpoint (env variable fallback)
+  const FORMSPREE_ENDPOINT =
+    process.env.REACT_APP_FORMSPREE_ENDPOINT || "https://formspree.io/f/xnndvdar";
 
   const handleSend = async () => {
     if (!input.trim()) return;
 
+    // Type-safe user message
     const userMsg: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
@@ -41,10 +37,7 @@ const AppointmentBot: React.FC = () => {
         setFormStage("contact");
         setMessages((prev) => [
           ...prev,
-          {
-            role: "assistant",
-            content: "Got it. What's your phone number or email?",
-          },
+          { role: "assistant", content: "Got it. What's your phone number or email?" },
         ]);
       } else if (formStage === "contact") {
         setFormData((prev) => ({ ...prev, contact: input }));
@@ -54,37 +47,28 @@ const AppointmentBot: React.FC = () => {
           { role: "assistant", content: "And what time works best for you?" },
         ]);
       } else if (formStage === "time") {
-        const fullData = { ...formData, time: input };
-
-        // ← posts to your real Formspree endpoint now
+        const full = { ...formData, time: input };
         const res = await fetch(FORMSPREE_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: fullData.name,
-            contact: fullData.contact,
-            time: fullData.time,
-            message: `Appointment request from ${fullData.name} at ${fullData.time}. Contact: ${fullData.contact}`,
+            name: full.name,
+            contact: full.contact,
+            time: full.time,
+            message: `Appointment request from ${full.name} at ${full.time}. Contact: ${full.contact}`,
           }),
         });
-
         if (!res.ok) throw new Error(`Formspree error ${res.status}`);
 
         setMessages((prev) => [
           ...prev,
-          {
-            role: "assistant",
-            content: "Thanks! Your appointment request has been sent.",
-          },
+          { role: "assistant", content: "Thanks! Your appointment request has been sent." },
         ]);
         setFormStage("done");
         setFormData({ name: "", contact: "", time: "" });
       } else {
-        const normalized = input.toLowerCase();
-        if (
-          normalized.includes("book") ||
-          normalized.includes("appointment")
-        ) {
+        const lower = input.toLowerCase();
+        if (lower.includes("book") || lower.includes("appointment")) {
           setFormStage("name");
           setMessages((prev) => [
             ...prev,
@@ -105,10 +89,7 @@ const AppointmentBot: React.FC = () => {
       console.error("Appointment send failed:", err);
       setMessages((prev) => [
         ...prev,
-        {
-          role: "assistant",
-          content: "Something went wrong while sending the request.",
-        },
+        { role: "assistant", content: "Something went wrong while sending the request." },
       ]);
     } finally {
       setLoading(false);
@@ -117,40 +98,43 @@ const AppointmentBot: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-white text-blue-900">
-      <header className="p-4 border-b border-blue-400">
+    <div className="h-screen flex flex-col bg-white text-gray-900">
+      <header className="p-4 border-b">
         <h1 className="text-2xl font-bold">Appointment Booking Bot</h1>
       </header>
 
-      <div className="flex-1 p-4 overflow-y-auto">
-        <div className="space-y-2">
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`text-${
-                msg.role === "user" ? "right" : "left"
-              }`}
+      <div className="flex-1 p-4 overflow-y-auto space-y-2">
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            className={msg.role === "user" ? "text-right" : "text-left"}
+          >
+            <span
+              className={
+                msg.role === "assistant"
+                  ? "inline-block bg-blue-100 p-2 rounded font-sans leading-relaxed"
+                  : "inline-block bg-white p-2 rounded"
+              }
             >
-              <span className="inline-block bg-blue-100 p-2 rounded">
-                {msg.content}
-              </span>
-            </div>
-          ))}
-          {loading && <p className="italic text-sm">Bot is typing...</p>}
-        </div>
+              {msg.content}
+            </span>
+          </div>
+        ))}
+        {loading && <p className="italic">Bot is typing...</p>}
       </div>
 
-      <footer className="p-4 border-t border-blue-400 flex">
+      <footer className="p-4 border-t flex">
         <input
-          className="flex-1 border border-blue-300 px-3 py-2 rounded-l-md"
+          className="flex-1 border px-3 py-2 rounded-l focus:outline-none"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           placeholder="Type here..."
         />
         <button
-          className="bg-blue-600 text-white px-4 py-2 rounded-r-md"
           onClick={handleSend}
+          className="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700 disabled:opacity-50"
+          disabled={loading}
         >
           Send
         </button>
@@ -160,5 +144,3 @@ const AppointmentBot: React.FC = () => {
 };
 
 export default AppointmentBot;
-
-
