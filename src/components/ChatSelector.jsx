@@ -5,6 +5,7 @@ import ChatBot from "../ChatBot";
 import AppointmentBot from "./bots/AppointmentBot";
 import RealEstateBot from "./bots/RealEstateBot";
 import LexBot from "./bots/LexBot";
+import SegmentationBot from "./bots/SegmentationBot"; // ✅ NEW
 
 export default function ChatSelector() {
   const [active, setActive] = useState(bots[0]);
@@ -30,9 +31,10 @@ export default function ChatSelector() {
 
       {/* bot router */}
       {active.key === "appointment" && <AppointmentBot />}
-      {active.key === "realestate" && <RealEstateBot />} {/* ✅ match .key in bots.js */}
+      {active.key === "realestate" && <RealEstateBot />}
       {active.key === "legal" && <LexBot />}
-      {["appointment", "realestate", "legal"].includes(active.key) === false && (
+      {active.key === "segment" && <SegmentationBot />} {/* ✅ NEW */}
+      {["appointment", "realestate", "legal", "segment"].includes(active.key) === false && (
         <ChatBot
           botName={active.name}
           prompt={active.prompt}

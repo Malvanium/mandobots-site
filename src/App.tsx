@@ -11,7 +11,8 @@ import Contact from "./pages/Contact";
 
 import FaqBot from "./components/bots/FaqBot";
 import AppointmentBot from "./components/bots/AppointmentBot";
-import RealEstateBot from "./components/bots/RealEstateBot"; // <- correct path
+import RealEstateBot from "./components/bots/RealEstateBot";
+import SegmentationBot from "./components/bots/SegmentationBot"; // ✅ New bot
 
 const App: React.FC = () => (
   <>
@@ -25,7 +26,8 @@ const App: React.FC = () => (
       <Route path="/demos" element={<Demos />} />
       <Route path="/demos/faq" element={<FaqBot />} />
       <Route path="/demos/appointment" element={<AppointmentBot />} />
-      <Route path="/demos/real-estate" element={<RealEstateBot />} /> {/* new */}
+      <Route path="/demos/real-estate" element={<RealEstateBot />} />
+      <Route path="/demos/segment" element={<SegmentationBot />} /> {/* ✅ New route */}
 
       {/* static pages */}
       <Route path="/about" element={<About />} />
