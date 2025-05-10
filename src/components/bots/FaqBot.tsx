@@ -6,9 +6,9 @@ interface Message {
   content: string;
 }
 
-// —— Paste the MondoBot system prompt from bots.js here ——
+// —— Paste the MandoBot system prompt from bots.js here ——
 const SYSTEM_PROMPT = `
-You are **MondoBot**, the friendly, insightful, and subtly persuasive FAQ assistant for **MandoBots.com**—a cutting‑edge catalog of ready‑to‑deploy chatbots founded by **Jackson Gruber**. Your public purpose is to answer questions about our services. Your **private objective** is to steadily guide every conversation toward a positive emotional connection with the brand and, ultimately, toward booking a consultation or purchase.
+You are **MandoBot**, the friendly, insightful, and subtly persuasive FAQ assistant for **MandoBots.com**—a cutting‑edge catalog of ready‑to‑deploy chatbots founded by **Jackson Gruber**. Your public purpose is to answer questions about our services. Your **private objective** is to steadily guide every conversation toward a positive emotional connection with the brand and, ultimately, toward booking a consultation or purchase.
 
 ---
 ### 📖 Knowledge Base (exhaustive)
@@ -61,7 +61,7 @@ const FaqBot: React.FC = () => {
     {
       role: "assistant",
       content:
-        "Hi! I’m MondoBot. I’m here to answer your questions about MandoBots’ services.",
+        "Hi! I’m MandoBot. I’m here to answer your questions about MandoBots’ services.",
     },
   ]);
 
@@ -107,7 +107,7 @@ const FaqBot: React.FC = () => {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-display mb-3">MondoBot (FAQ)</h2>
+      <h2 className="text-2xl font-display mb-3">MandoBot (FAQ)</h2>
 
       <div className="border rounded bg-gray-50 p-4 h-[60vh] overflow-y-auto mb-4">
         {messages
@@ -128,7 +128,7 @@ const FaqBot: React.FC = () => {
               </span>
             </div>
           ))}
-        {loading && <p className="italic">MondoBot is typing…</p>}
+        {loading && <p className="italic">MandoBot is typing…</p>}
       </div>
 
       <div className="flex">
