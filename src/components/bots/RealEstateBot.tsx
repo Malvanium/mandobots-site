@@ -24,7 +24,7 @@ const getCredits = (): number => {
   return stored ? parseInt(stored) : MAX_CREDITS;
 };
 
-const useCredit = () => {
+const burnCredit = () => {
   const remaining = getCredits() - 1;
   localStorage.setItem(`credits-${botKey}`, remaining.toString());
   return remaining;
@@ -59,7 +59,7 @@ const RealEstateBotContent: React.FC = () => {
       return;
     }
 
-    useCredit(); // Deduct 1 credit
+    burnCredit(); // ✅ renamed to comply with ESLint rules
 
     const newMsgs: Message[] = [...messages, { role: "user", content: input }];
     setMessages(newMsgs);
