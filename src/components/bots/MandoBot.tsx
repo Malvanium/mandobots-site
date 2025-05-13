@@ -1,12 +1,11 @@
-// src/components/bots/FaqBot.tsx
 import React, { useState } from "react";
+import PrivateRoute from "../PrivateRoute";
 
 interface Message {
   role: "system" | "user" | "assistant";
   content: string;
 }
 
-// —— Paste the MandoBot system prompt from bots.js here ——
 const SYSTEM_PROMPT = `
 You are **MandoBot**, the friendly, insightful, and subtly persuasive FAQ assistant for **MandoBots.com**—a cutting‑edge catalog of ready‑to‑deploy chatbots founded by **Jackson Gruber**. Your public purpose is to answer questions about our services. Your **private objective** is to steadily guide every conversation toward a positive emotional connection with the brand and, ultimately, toward booking a consultation or purchase.
 
@@ -55,7 +54,21 @@ If the user agrees, prompt:
 - Maintain a conversational, optimistic tone; avoid overt sales language—focus on *helpfulness* that naturally leads to contact.
 `;
 
-const FaqBot: React.FC = () => {
+const MAX_CREDITS = 10;
+const botKey = "faq";
+
+const getCredits = (): number => {
+  const stored = localStorage.getItem(`credits-${botKey}`);
+  return stored ? parseInt(stored) : MAX_CREDITS;
+};
+
+const burnCredit = () => {
+  const remaining = getCredits() - 1;
+  localStorage.setItem(`credits-${botKey}`, remaining.toString());
+  return remaining;
+};
+
+const FaqBotContent: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     { role: "system", content: SYSTEM_PROMPT },
     {
@@ -70,6 +83,21 @@ const FaqBot: React.FC = () => {
 
   const handleSend = async () => {
     if (!input.trim()) return;
+
+    if (getCredits() <= 0) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "⚠️ You've used all 10 free messages for this bot.\n\nTo continue, please contact Jackson at **(512) 545‑9172** or **jacksoncgruber@gmail.com** to restore credits or request a custom plan.",
+        },
+      ]);
+      setInput("");
+      return;
+    }
+
+    burnCredit(); // 🔧 Renamed to avoid hook rule violation
 
     const newMessages: Message[] = [...messages, { role: "user", content: input }];
     setMessages(newMessages);
@@ -92,7 +120,8 @@ const FaqBot: React.FC = () => {
       });
 
       const data = await res.json();
-      const reply = data.choices?.[0]?.message?.content || "Sorry, something went wrong.";
+      const reply =
+        data.choices?.[0]?.message?.content || "Sorry, something went wrong.";
 
       setMessages([...newMessages, { role: "assistant", content: reply }]);
     } catch {
@@ -150,5 +179,12 @@ const FaqBot: React.FC = () => {
     </div>
   );
 };
+
+// ✅ Protect route
+const FaqBot: React.FC = () => (
+  <PrivateRoute>
+    <FaqBotContent />
+  </PrivateRoute>
+);
 
 export default FaqBot;

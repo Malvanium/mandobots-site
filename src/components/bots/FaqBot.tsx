@@ -1,11 +1,26 @@
 import React, { useState } from "react";
+import PrivateRoute from "../PrivateRoute";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
-const SampleFaqBot: React.FC = () => {
+const MAX_CREDITS = 10;
+const botKey = "samplefaq";
+
+const getCredits = (): number => {
+  const stored = localStorage.getItem(`credits-${botKey}`);
+  return stored ? parseInt(stored) : MAX_CREDITS;
+};
+
+const burnCredit = () => {
+  const remaining = getCredits() - 1;
+  localStorage.setItem(`credits-${botKey}`, remaining.toString());
+  return remaining;
+};
+
+const SampleFaqBotContent: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -19,7 +34,6 @@ const SampleFaqBot: React.FC = () => {
   const generateResponse = (userInput: string): string => {
     const input = userInput.toLowerCase();
 
-    // Define canned responses
     if (input.includes("hours")) {
       return "Our demo business is open Monday through Friday, 9am to 6pm!";
     }
@@ -57,13 +71,28 @@ const SampleFaqBot: React.FC = () => {
       return "Hey there! I'm a sample bot from MandoBots. Try asking about hours, pricing, or returns so you can see how a chatbot like this could assist your customers.";
     }
 
-    // Off-topic handling
     return `That’s a good question, but I’m just a sample bot trained only on fictional company info.
 If you'd like to explore how a bot like this could handle your real FAQs, feel free to call (512) 545‑9172 or email jacksoncgruber@gmail.com. I can also help summarize what you'd want your own bot to answer!`;
   };
 
   const handleSend = () => {
     if (!input.trim()) return;
+
+    // 🔒 Rate-limit check
+    if (getCredits() <= 0) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "⚠️ You've used all 10 free messages for this demo bot.\n\nTo try this for your business, contact Jackson at **(512) 545‑9172** or **jacksoncgruber@gmail.com**.",
+        },
+      ]);
+      setInput("");
+      return;
+    }
+
+    burnCredit(); // ✅ Renamed to fix ESLint hook rule
 
     const userMsg: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMsg]);
@@ -124,5 +153,11 @@ If you'd like to explore how a bot like this could handle your real FAQs, feel f
     </div>
   );
 };
+
+const SampleFaqBot: React.FC = () => (
+  <PrivateRoute>
+    <SampleFaqBotContent />
+  </PrivateRoute>
+);
 
 export default SampleFaqBot;

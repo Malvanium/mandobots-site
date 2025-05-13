@@ -1,27 +1,22 @@
 {
   "compilerOptions": {
-"checkJs": false,
-"target": "es5",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true,
-    "module": "esnext",
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx"
+    "target": "es2015",                      // Modern JS target
+    "module": "esnext",                      // Supports modern import/export
+    "lib": ["dom", "dom.iterable", "esnext"], // Includes browser + async features
+    "allowJs": true,                         // Allow .js files in project
+    "checkJs": false,                        // Don't type-check JS
+    "skipLibCheck": true,                    // Speeds up compile time
+    "esModuleInterop": true,                 // For `import fs from 'fs'` compatibility
+    "allowSyntheticDefaultImports": true,    // Allow default imports even if not declared
+    "strict": true,                          // Enables all strict type-checking
+    "forceConsistentCasingInFileNames": true,// Prevent case mismatch across OSes
+    "noFallthroughCasesInSwitch": true,      // Prevent bugs in switch statements
+    "moduleResolution": "node",              // Standard Node-style resolution
+    "resolveJsonModule": true,               // Allow importing .json files
+    "isolatedModules": true,                 // Required for Vite/Next/Firebase + TS
+    "noEmit": true,                          // Don't emit files
+    "jsx": "react-jsx"                       // Required for React 17+ JSX transform
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }
+

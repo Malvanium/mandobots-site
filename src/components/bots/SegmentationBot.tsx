@@ -1,11 +1,26 @@
 import React, { useState } from "react";
+import PrivateRoute from "../PrivateRoute";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
-const SegmentationBot: React.FC = () => {
+const MAX_CREDITS = 10;
+const botKey = "segmentation";
+
+const getCredits = (): number => {
+  const stored = localStorage.getItem(`credits-${botKey}`);
+  return stored ? parseInt(stored) : MAX_CREDITS;
+};
+
+const burnCredit = () => {
+  const remaining = getCredits() - 1;
+  localStorage.setItem(`credits-${botKey}`, remaining.toString());
+  return remaining;
+};
+
+const SegmentationBotContent: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -20,6 +35,21 @@ const SegmentationBot: React.FC = () => {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const uploaded = e.target.files?.[0];
     if (!uploaded) return;
+
+    // 🔒 Check credit limit
+    if (getCredits() <= 0) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "⚠️ You've used all 10 free uploads.\n\nTo continue using this clustering assistant or to install it on your own site, contact Jackson at **(512) 545‑9172** or **jacksoncgruber@gmail.com**.",
+        },
+      ]);
+      return;
+    }
+
+    burnCredit(); // ✅ Renamed to avoid ESLint false positive
 
     setMessages((prev) => [
       ...prev,
@@ -100,5 +130,11 @@ const SegmentationBot: React.FC = () => {
     </div>
   );
 };
+
+const SegmentationBot: React.FC = () => (
+  <PrivateRoute>
+    <SegmentationBotContent />
+  </PrivateRoute>
+);
 
 export default SegmentationBot;

@@ -1,5 +1,5 @@
-// src/components/bots/LexBot.tsx
 import React, { useState } from "react";
+import PrivateRoute from "../PrivateRoute";
 
 interface Message {
   role: "system" | "user" | "assistant";
@@ -31,7 +31,21 @@ You are **LexBot**, a trusted internal assistant for a private law firm. Your jo
 - Do not assist with external (client-facing) legal requests.
 `;
 
-const LexBot: React.FC = () => {
+const MAX_CREDITS = 10;
+const botKey = "lex";
+
+const getCredits = (): number => {
+  const stored = localStorage.getItem(`credits-${botKey}`);
+  return stored ? parseInt(stored) : MAX_CREDITS;
+};
+
+const burnCredit = () => {
+  const remaining = getCredits() - 1;
+  localStorage.setItem(`credits-${botKey}`, remaining.toString());
+  return remaining;
+};
+
+const LexBotContent: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     { role: "system", content: SYSTEM_PROMPT },
     {
@@ -46,6 +60,22 @@ const LexBot: React.FC = () => {
 
   const handleSend = async () => {
     if (!input.trim()) return;
+
+    // 🔒 Rate limit check
+    if (getCredits() <= 0) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "⚠️ You've used all 10 free messages for this bot.\n\nTo continue, please contact Jackson at **(512) 545‑9172** or **jacksoncgruber@gmail.com** to restore credits or request a custom plan.",
+        },
+      ]);
+      setInput("");
+      return;
+    }
+
+    burnCredit(); // ✅ Renamed to comply with React hook naming rules
 
     const newMessages: Message[] = [...messages, { role: "user", content: input }];
     setMessages(newMessages);
@@ -71,10 +101,13 @@ const LexBot: React.FC = () => {
       const reply = data.choices?.[0]?.message?.content || "⚠️ No response.";
       setMessages([...newMessages, { role: "assistant", content: reply }]);
     } catch {
-      setMessages([...newMessages, {
-        role: "assistant",
-        content: "⚠️ API error. Please try again later."
-      }]);
+      setMessages([
+        ...newMessages,
+        {
+          role: "assistant",
+          content: "⚠️ API error. Please try again later.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -125,5 +158,12 @@ const LexBot: React.FC = () => {
     </div>
   );
 };
+
+// ✅ Wrap in login check
+const LexBot: React.FC = () => (
+  <PrivateRoute>
+    <LexBotContent />
+  </PrivateRoute>
+);
 
 export default LexBot;

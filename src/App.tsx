@@ -12,9 +12,12 @@ import Contact from "./pages/Contact";
 import FaqBot from "./components/bots/FaqBot";
 import AppointmentBot from "./components/bots/AppointmentBot";
 import RealEstateBot from "./components/bots/RealEstateBot";
-import SegmentationBot from "./components/bots/SegmentationBot"; // ✅ New bot
+import SegmentationBot from "./components/bots/SegmentationBot";
 
-import MandoBotPage from "./pages/MandoBot"; // ✅ New standalone page
+import MandoBotPage from "./components/bots/MandoBot"; // ✅ Standalone page for your site's FAQ
+import Login from "./pages/Login"; // ✅ Login page
+
+import PrivateRoute from "./components/PrivateRoute"; // ✅ Protect sensitive bot routes
 
 const App: React.FC = () => (
   <>
@@ -26,13 +29,28 @@ const App: React.FC = () => (
 
       {/* demo hub */}
       <Route path="/demos" element={<Demos />} />
-      <Route path="/demos/faq" element={<FaqBot />} />
-      <Route path="/demos/appointment" element={<AppointmentBot />} />
-      <Route path="/demos/real-estate" element={<RealEstateBot />} />
-      <Route path="/demos/segment" element={<SegmentationBot />} /> {/* ✅ New route */}
+      <Route
+        path="/demos/faq"
+        element={<PrivateRoute><FaqBot /></PrivateRoute>}
+      />
+      <Route
+        path="/demos/appointment"
+        element={<PrivateRoute><AppointmentBot /></PrivateRoute>}
+      />
+      <Route
+        path="/demos/real-estate"
+        element={<PrivateRoute><RealEstateBot /></PrivateRoute>}
+      />
+      <Route
+        path="/demos/segment"
+        element={<PrivateRoute><SegmentationBot /></PrivateRoute>}
+      />
 
       {/* official FAQ bot */}
-      <Route path="/mandobot" element={<MandoBotPage />} /> {/* ✅ New route */}
+      <Route path="/mandobot" element={<MandoBotPage />} />
+
+      {/* auth */}
+      <Route path="/login" element={<Login />} />
 
       {/* static pages */}
       <Route path="/about" element={<About />} />

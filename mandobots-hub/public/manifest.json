@@ -1,0 +1,13 @@
+{
+  "short_name": "MandoBots",
+  "name": "MandoBots Hub",
+  "icons": [
+    { "src": "favicon-96x96.png", "type": "image/png", "sizes": "96x96" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "favicon.svg", "type": "image/svg+xml", "sizes": "any" }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F8F9FA",
+  "theme_color": "#E63946"
+}

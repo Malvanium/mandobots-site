@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PrivateRoute from "../PrivateRoute";
 
 interface Message {
   role: "system" | "user" | "assistant";
@@ -15,7 +16,21 @@ const SYSTEM_PROMPT: Message = {
 • Answer clearly in ≤ 3 short paragraphs, polite and upbeat.`,
 };
 
-const RealEstateBot: React.FC = () => {
+const MAX_CREDITS = 10;
+const botKey = "realestate";
+
+const getCredits = (): number => {
+  const stored = localStorage.getItem(`credits-${botKey}`);
+  return stored ? parseInt(stored) : MAX_CREDITS;
+};
+
+const useCredit = () => {
+  const remaining = getCredits() - 1;
+  localStorage.setItem(`credits-${botKey}`, remaining.toString());
+  return remaining;
+};
+
+const RealEstateBotContent: React.FC = () => {
   const CHAT_ENDPOINT = process.env.REACT_APP_CHAT_ENDPOINT || "";
   const OPENAI_KEY = process.env.REACT_APP_OPENAI_API_KEY || "";
 
@@ -25,12 +40,26 @@ const RealEstateBot: React.FC = () => {
       content: "Hi! I’m Riley. Ask me anything about buying or selling a home.",
     },
   ]);
-
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSend = async () => {
     if (!input.trim()) return;
+
+    if (getCredits() <= 0) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "⚠️ You've used all 10 free messages for this demo bot.\n\nTo set up a bot like this for your real estate site, contact Jackson at **(512) 545‑9172** or **jacksoncgruber@gmail.com**.",
+        },
+      ]);
+      setInput("");
+      return;
+    }
+
+    useCredit(); // Deduct 1 credit
 
     const newMsgs: Message[] = [...messages, { role: "user", content: input }];
     setMessages(newMsgs);
@@ -104,5 +133,11 @@ const RealEstateBot: React.FC = () => {
     </div>
   );
 };
+
+const RealEstateBot: React.FC = () => (
+  <PrivateRoute>
+    <RealEstateBotContent />
+  </PrivateRoute>
+);
 
 export default RealEstateBot;

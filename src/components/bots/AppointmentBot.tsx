@@ -1,9 +1,23 @@
-// src/components/bots/AppointmentBot.tsx
 import React, { useState } from "react";
+import PrivateRoute from "../PrivateRoute";
 
 type Message = { role: "user" | "assistant"; content: string };
 
-const AppointmentBot: React.FC = () => {
+const MAX_CREDITS = 10;
+const botKey = "appointment";
+
+const getCredits = (): number => {
+  const stored = localStorage.getItem(`credits-${botKey}`);
+  return stored ? parseInt(stored) : MAX_CREDITS;
+};
+
+const burnCredit = () => {
+  const remaining = getCredits() - 1;
+  localStorage.setItem(`credits-${botKey}`, remaining.toString());
+  return remaining;
+};
+
+const AppointmentBotContent: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -19,14 +33,28 @@ const AppointmentBot: React.FC = () => {
   >("idle");
   const [formData, setFormData] = useState({ name: "", contact: "", time: "" });
 
-  // Formspree endpoint (env variable fallback)
   const FORMSPREE_ENDPOINT =
     process.env.REACT_APP_FORMSPREE_ENDPOINT || "https://formspree.io/f/xnndvdar";
 
   const handleSend = async () => {
     if (!input.trim()) return;
 
-    // Type-safe user message
+    // 🔒 Rate-limit check
+    if (getCredits() <= 0) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "⚠️ You've used all 10 free messages for this bot.\n\nTo continue, please contact Jackson at **(512) 545‑9172** or **jacksoncgruber@gmail.com** to restore credits or request a custom plan.",
+        },
+      ]);
+      setInput("");
+      return;
+    }
+
+    burnCredit(); // ✅ Renamed to avoid ESLint hook rule violation
+
     const userMsg: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
@@ -142,5 +170,12 @@ const AppointmentBot: React.FC = () => {
     </div>
   );
 };
+
+// ✅ Wrap with auth gate
+const AppointmentBot: React.FC = () => (
+  <PrivateRoute>
+    <AppointmentBotContent />
+  </PrivateRoute>
+);
 
 export default AppointmentBot;

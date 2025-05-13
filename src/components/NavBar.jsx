@@ -14,6 +14,7 @@ const NavBar = () => {
     { to: "/rates", label: "Rates" },
     { to: "/about", label: "About" },
     { to: "/contact", label: "Contact" },
+    { to: "/login", label: "Login" }, // ✅ New Login link
   ];
 
   const toggle = () => setOpen(!open);

@@ -1,7 +1,28 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 export default function Home() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallButton, setShowInstallButton] = useState(false);
+
+  useEffect(() => {
+    window.addEventListener("beforeinstallprompt", (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallButton(true);
+    });
+  }, []);
+
+  const handleInstall = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => {
+        setDeferredPrompt(null);
+        setShowInstallButton(false);
+      });
+    }
+  };
+
   return (
     <div className="p-8 text-center flex flex-col items-center justify-center space-y-10">
 
@@ -48,6 +69,18 @@ export default function Home() {
           </Link>
         </div>
       </div>
+
+      {/* ✅ Install App CTA */}
+      {showInstallButton && (
+        <div className="mt-6">
+          <button
+            onClick={handleInstall}
+            className="bg-primary text-white px-6 py-3 rounded-lg font-bold shadow-lg hover:bg-red-700 transition"
+          >
+            📱 Install MandoBots Hub App
+          </button>
+        </div>
+      )}
     </div>
   );
 }
