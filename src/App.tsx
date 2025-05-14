@@ -18,6 +18,7 @@ import MandoBotPage from "./components/bots/MandoBot"; // ✅ Standalone page fo
 import Login from "./pages/Login"; // ✅ Login page
 
 import PrivateRoute from "./components/PrivateRoute"; // ✅ Protect sensitive bot routes
+import InstallPrompt from "./components/InstallPrompt"; // ✅ NEW: PWA install prompt
 
 const App: React.FC = () => (
   <>
@@ -56,6 +57,8 @@ const App: React.FC = () => (
       <Route path="/about" element={<About />} />
       <Route path="/contact" element={<Contact />} />
     </Routes>
+
+    <InstallPrompt /> {/* ✅ Add PWA install prompt */}
   </>
 );
 
