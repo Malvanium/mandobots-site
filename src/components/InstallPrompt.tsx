@@ -1,35 +1,50 @@
+// src/components/InstallPrompt.tsx
 import React, { useEffect, useState } from "react";
 
 const InstallPrompt: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isIos, setIsIos] = useState(false);
-  const [isInStandaloneMode, setIsInStandaloneMode] = useState(false);
+  const [supportsInstall, setSupportsInstall] = useState(false);
 
   useEffect(() => {
-    const ua = window.navigator.userAgent.toLowerCase();
-    setIsIos(/iphone|ipad|ipod/.test(ua));
-    setIsInStandaloneMode(("standalone" in window.navigator) && (window.navigator as any).standalone);
-
     const handler = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as any);
+      setSupportsInstall(true);
     };
 
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+
+    // Fallback: if Chrome install prompt isn’t fired, still show button
+    setTimeout(() => {
+      if (window.matchMedia('(display-mode: browser)').matches) {
+        setSupportsInstall(true);
+      }
+    }, 1000);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
   }, []);
 
   const handleInstall = async () => {
     if (deferredPrompt) {
-      (deferredPrompt as any).prompt();
-      const result = await (deferredPrompt as any).userChoice;
-      console.log("Install outcome:", result.outcome);
-    } else if (isIos && !isInStandaloneMode) {
-      alert("To install this app:\n\n1. Tap the Share button in Safari\n2. Select 'Add to Home Screen'");
+      deferredPrompt.prompt();
+      const result = await deferredPrompt.userChoice;
+      if (result.outcome === "accepted") {
+        console.log("✅ User installed the app");
+      } else {
+        console.log("❌ User dismissed the install prompt");
+      }
+      setDeferredPrompt(null);
     } else {
-      alert("Installation is not supported on your device/browser.");
+      // Desktop fallback
+      alert(
+        "If you don’t see an install prompt, open the Chrome menu (⋮) and select 'Install MandoBots'."
+      );
     }
   };
+
+  if (!supportsInstall) return null;
 
   return (
     <button

@@ -20,6 +20,9 @@ import Login from "./pages/Login"; // ✅ Login page
 import PrivateRoute from "./components/PrivateRoute"; // ✅ Protect sensitive bot routes
 import InstallPrompt from "./components/InstallPrompt"; // ✅ NEW: PWA install prompt
 
+import AdminPanel from "./pages/AdminPanel"; // ✅ NEW: Admin panel route
+import CustomBots from "./pages/CustomBots"; // ✅ NEW: User-specific custom bots page
+
 const App: React.FC = () => (
   <>
     <NavBar />
@@ -52,6 +55,18 @@ const App: React.FC = () => (
 
       {/* auth */}
       <Route path="/login" element={<Login />} />
+
+      {/* admin-only panel */}
+      <Route
+        path="/admin"
+        element={<PrivateRoute><AdminPanel /></PrivateRoute>}
+      />
+
+      {/* user-accessible custom bots */}
+      <Route
+        path="/custom-bots"
+        element={<PrivateRoute><CustomBots /></PrivateRoute>}
+      />
 
       {/* static pages */}
       <Route path="/about" element={<About />} />
