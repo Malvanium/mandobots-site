@@ -8,7 +8,7 @@ import {
   getAdditionalUserInfo,
   signOut,
 } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
 
 export default function Login() {
@@ -18,6 +18,19 @@ export default function Login() {
   const [newUser, setNewUser] = useState(false);
   const [error, setError] = useState("");
 
+  const syncUserToFirestore = async (firebaseUser: any, provider: string) => {
+    const userRef = doc(db, "users", firebaseUser.uid);
+    const docSnap = await getDoc(userRef);
+    if (!docSnap.exists()) {
+      await setDoc(userRef, {
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || "Unnamed",
+        provider,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  };
+
   const handleGoogleLogin = async () => {
     try {
       const result = await signInWithPopup(auth, provider);
@@ -25,13 +38,7 @@ export default function Login() {
       const additionalInfo = getAdditionalUserInfo(result);
       const isNewUser = additionalInfo?.isNewUser;
 
-      if (isNewUser) {
-        await setDoc(doc(db, "users", firebaseUser.uid), {
-          email: firebaseUser.email,
-          createdAt: new Date().toISOString(),
-          provider: "google",
-        });
-      }
+      await syncUserToFirestore(firebaseUser, "google");
     } catch (err: any) {
       console.error("Google login failed:", err);
       setError(err.message || "An unexpected error occurred during Google login.");
@@ -45,14 +52,10 @@ export default function Login() {
         const firebaseUser = result.user;
 
         await sendEmailVerification(firebaseUser);
-
-        await setDoc(doc(db, "users", firebaseUser.uid), {
-          email: firebaseUser.email,
-          createdAt: new Date().toISOString(),
-          provider: "email",
-        });
+        await syncUserToFirestore(firebaseUser, "email");
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        await syncUserToFirestore(result.user, "email");
       }
     } catch (err: any) {
       console.error("Email login failed:", err);

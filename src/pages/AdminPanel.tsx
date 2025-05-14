@@ -1,4 +1,3 @@
-// src/pages/AdminPanel.tsx
 import React, { useEffect, useState, useRef } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../firebase";
@@ -6,6 +5,7 @@ import {
   collection,
   getDocs,
   doc,
+  getDoc,
   setDoc,
   Timestamp,
 } from "firebase/firestore";
@@ -90,16 +90,29 @@ const AdminPanel: React.FC = () => {
 
   const handleAssign = async (userId: string, bot: Bot) => {
     try {
-      const path = doc(db, "bots", userId, "bots", bot.id);
-      await setDoc(path, {
+      // Assign bot config under /bots/{uid}/bots/{botId}
+      const botConfigPath = doc(db, "bots", userId, "bots", bot.id);
+      await setDoc(botConfigPath, {
         name: bot.name,
         embedUrl: bot.embedUrl,
         createdAt: Timestamp.now(),
       });
 
+      // Grant frontend access under /customBots/{uid}
+      const customBotPath = doc(db, "customBots", userId);
+      const existing = await getDoc(customBotPath);
+      const currentData = existing.exists() ? existing.data() : {};
+      const updatedBots = { ...(currentData.bots || {}), [bot.id]: true };
+
+      await setDoc(customBotPath, {
+        ...currentData,
+        bots: updatedBots,
+      });
+
       setMessage(`✅ Assigned "${bot.name}" to ${userId}`);
       setTimeout(() => setMessage(""), 3000);
     } catch (err) {
+      console.error("❌ Failed to assign bot:", err);
       setMessage("❌ Failed to assign bot");
     }
   };
@@ -176,9 +189,7 @@ const AdminPanel: React.FC = () => {
                   <p className="text-sm text-gray-500">No bots assigned yet.</p>
                 )}
               </div>
-              <div
-                className="mt-4 p-4 border-2 border-dashed border-primary rounded bg-gray-50 text-center"
-              >
+              <div className="mt-4 p-4 border-2 border-dashed border-primary rounded bg-gray-50 text-center">
                 <p>Drop bots here to assign to {selectedUser.displayName}</p>
               </div>
               <div className="mt-2">

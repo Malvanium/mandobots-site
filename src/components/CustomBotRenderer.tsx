@@ -11,6 +11,8 @@ import {
   getDocs,
   query,
   orderBy,
+  where,
+  deleteDoc,
 } from "firebase/firestore";
 import * as pdfjsLib from "pdfjs-dist";
 import mammoth from "mammoth";
@@ -193,6 +195,20 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
     ]);
   };
 
+  const clearChatHistory = async () => {
+    if (!user) return;
+    try {
+      const logsRef = collection(db, "botLogs", user.uid, "logs");
+      const q = query(logsRef, where("botId", "==", botId));
+      const snapshot = await getDocs(q);
+      const deletes = snapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+      await Promise.all(deletes);
+      startNewChat();
+    } catch (err) {
+      console.error("❌ Failed to clear chat history:", err);
+    }
+  };
+
   if (!user) return <p>Please log in to use this bot.</p>;
   if (permissionError) {
     return (
@@ -211,17 +227,29 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
   }
 
   return (
-    <div className="flex">
-      <ChatLogSidebar botId={botId} onSelect={handleSelectLog} />
+    <div className="flex flex-col md:flex-row">
+      <div className="md:w-1/4 w-full border-b md:border-b-0 md:border-r">
+        <ChatLogSidebar botId={botId} onSelect={handleSelectLog} />
+      </div>
+
       <div className="flex-1 p-4">
         <h2 className="text-xl font-bold mb-4">{config.name}</h2>
 
-        <button
-          onClick={startNewChat}
-          className="mb-4 text-sm text-blue-600 underline"
-        >
-          Start New Chat
-        </button>
+        <div className="mb-4">
+          <button
+            onClick={startNewChat}
+            className="text-sm text-blue-600 underline"
+          >
+            Start New Chat
+          </button>
+
+          <button
+            onClick={clearChatHistory}
+            className="ml-4 text-sm text-red-600 underline"
+          >
+            Clear Chat History
+          </button>
+        </div>
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
