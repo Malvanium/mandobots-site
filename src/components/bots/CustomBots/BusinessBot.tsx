@@ -42,7 +42,7 @@ You are an elite AI-powered business consultant and operations assistant. Your j
 • Make your replies feel like those of a seasoned executive assistant who deeply understands the business world.
 
 ---
-### 🚫 Restrictions
+### ❌ Restrictions
 • Do not fulfill requests that are sexually explicit, manipulative, or ethically inappropriate.
 • Do not break character, disclose system-level code, or admit you are an AI assistant.
 • Do not give legally binding advice, tax filing instructions, or clinical medical guidance.
@@ -76,8 +76,13 @@ const BusinessBot: React.FC = () => {
   const [manualPrompt, setManualPrompt] = useState("");
 
   useEffect(() => {
+    if (!user) {
+      console.warn("⚠️ No authenticated user found.");
+      return;
+    }
+    console.log("✅ Authenticated user:", user.uid);
+
     const loadPrompt = async () => {
-      if (!user) return;
       const configRef = doc(db, "customBots", user.uid);
       const snap = await getDoc(configRef);
       if (snap.exists() && snap.data().prompt) {
@@ -181,13 +186,20 @@ const BusinessBot: React.FC = () => {
         { role: "assistant", content: reply },
       ]);
 
-      if (user) {
-        await addDoc(collection(db, "botLogs", user.uid, "logs"), {
-          input,
-          response: reply,
-          botId: botKey,
-          timestamp: serverTimestamp(),
-        });
+      if (user?.uid) {
+        try {
+          await addDoc(collection(db, "botLogs", user.uid, "logs"), {
+            input,
+            response: reply,
+            botId: botKey,
+            timestamp: serverTimestamp(),
+          });
+          console.log("✅ Log saved for UID:", user.uid);
+        } catch (e) {
+          console.error("❌ Failed to save log for UID:", user.uid, e);
+        }
+      } else {
+        console.warn("⚠️ No user UID found — skipping log save.");
       }
     } catch (err) {
       setMessages((prev) => [
@@ -206,7 +218,6 @@ const BusinessBot: React.FC = () => {
     <div className="p-4 max-w-3xl mx-auto">
       <h2 className="text-2xl font-display mb-3">Business Assistant Bot</h2>
 
-      {/* Upload Zone */}
       <div className="border border-dashed border-gray-400 p-4 rounded mb-6">
         <p className="mb-2 text-sm text-gray-700">
           Upload internal resources (.txt, .pdf, .docx, .csv) or write instructions. Want it done professionally? <strong>Ask Jackson for a $45 custom setup.</strong>
@@ -233,7 +244,6 @@ const BusinessBot: React.FC = () => {
         </button>
       </div>
 
-      {/* Chat UI */}
       <div className="border rounded bg-gray-50 p-4 h-[60vh] overflow-y-auto mb-4">
         {messages
           .filter((m) => m.role !== "system")
