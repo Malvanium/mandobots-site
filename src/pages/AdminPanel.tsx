@@ -1,3 +1,4 @@
+// AdminPanel.tsx
 import React, { useEffect, useState, useRef } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../firebase";
@@ -8,9 +9,13 @@ import {
   getDoc,
   setDoc,
   Timestamp,
+  query,
+  where,
+  updateDoc,
 } from "firebase/firestore";
-import { DndProvider, useDrag, useDrop } from "react-dnd";
+import { DndProvider, useDrag } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { getChatSummary } from "../utils/summarize";
 
 interface Bot {
   id: string;
@@ -22,6 +27,12 @@ interface User {
   id: string;
   email: string;
   displayName: string;
+}
+
+interface Summary {
+  id: string;
+  summary: string;
+  timestamp: Timestamp;
 }
 
 const BotCard: React.FC<{ bot: Bot }> = ({ bot }) => {
@@ -55,6 +66,8 @@ const AdminPanel: React.FC = () => {
   const [bots, setBots] = useState<Bot[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [assignedBots, setAssignedBots] = useState<Bot[]>([]);
+  const [summaries, setSummaries] = useState<Summary[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
   const [message, setMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -85,12 +98,38 @@ const AdminPanel: React.FC = () => {
       setAssignedBots(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Bot)));
     };
 
+    const loadSummaries = async () => {
+      if (!selectedUser) return;
+      const ref = collection(db, "botLogs", selectedUser.id, "logs");
+      const q = query(ref, where("summary", "!=", ""));
+      const snap = await getDocs(q);
+      const result: Summary[] = snap.docs.map((doc) => ({
+        id: doc.id,
+        summary: doc.data().summary,
+        timestamp: doc.data().timestamp,
+      }));
+      setSummaries(result);
+    };
+
+    const loadLogs = async () => {
+      if (!selectedUser) return;
+      const ref = collection(db, "botLogs", selectedUser.id, "logs");
+      const snap = await getDocs(ref);
+      setLogs(
+        snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+      );
+    };
+
     loadAssignedBots();
+    loadSummaries();
+    loadLogs();
   }, [selectedUser]);
 
   const handleAssign = async (userId: string, bot: Bot) => {
     try {
-      // Assign bot config under /bots/{uid}/bots/{botId}
       const botConfigPath = doc(db, "bots", userId, "bots", bot.id);
       await setDoc(botConfigPath, {
         name: bot.name,
@@ -98,7 +137,6 @@ const AdminPanel: React.FC = () => {
         createdAt: Timestamp.now(),
       });
 
-      // Grant frontend access under /customBots/{uid}
       const customBotPath = doc(db, "customBots", userId);
       const existing = await getDoc(customBotPath);
       const currentData = existing.exists() ? existing.data() : {};
@@ -114,6 +152,22 @@ const AdminPanel: React.FC = () => {
     } catch (err) {
       console.error("❌ Failed to assign bot:", err);
       setMessage("❌ Failed to assign bot");
+    }
+  };
+
+  const handleSummarizeLog = async (log: any) => {
+    if (!selectedUser) return;
+    try {
+      const summary = await getChatSummary(log.messages, selectedUser.id, log.botId || "unknownBot");
+      const logRef = doc(db, "botLogs", selectedUser.id, "logs", log.id);
+      await updateDoc(logRef, {
+        summary,
+        summarizedAt: Timestamp.now(),
+      });
+      setMessage("✅ Summary generated and saved.");
+    } catch (err) {
+      console.error("❌ Failed to summarize:", err);
+      setMessage("❌ Failed to summarize chat log.");
     }
   };
 
@@ -144,6 +198,20 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const testSummarize = async () => {
+    try {
+      const messages = [
+        { role: "user", content: "How do I book an appointment?" },
+        { role: "assistant", content: "Click the 'Book Now' button and choose a time." },
+      ];
+      const summary = await getChatSummary(messages, "demoUser123", "faqBot");
+      alert("Test Summary:\n" + summary);
+    } catch (err) {
+      alert("❌ Failed to generate test summary.");
+      console.error(err);
+    }
+  };
+
   if (!user) return <p>Please log in.</p>;
   if (user.email !== "jacksoncgruber@gmail.com")
     return <p>Access denied. This page is admin-only.</p>;
@@ -157,7 +225,9 @@ const AdminPanel: React.FC = () => {
             {users.map((u) => (
               <div
                 key={u.id}
-                className={`p-3 border rounded cursor-pointer hover:bg-gray-100 ${selectedUser?.id === u.id ? "bg-gray-200" : ""}`}
+                className={`p-3 border rounded cursor-pointer hover:bg-gray-100 ${
+                  selectedUser?.id === u.id ? "bg-gray-200" : ""
+                }`}
                 onClick={() => setSelectedUser(u)}
               >
                 <h4 className="font-semibold">{u.displayName}</h4>
@@ -175,6 +245,7 @@ const AdminPanel: React.FC = () => {
                 <p><strong>Name:</strong> {selectedUser.displayName}</p>
                 <p><strong>Email:</strong> {selectedUser.email}</p>
               </div>
+
               <div>
                 <h3 className="text-lg font-semibold mb-2">Assigned Bots:</h3>
                 {assignedBots.length > 0 ? (
@@ -189,9 +260,11 @@ const AdminPanel: React.FC = () => {
                   <p className="text-sm text-gray-500">No bots assigned yet.</p>
                 )}
               </div>
+
               <div className="mt-4 p-4 border-2 border-dashed border-primary rounded bg-gray-50 text-center">
                 <p>Drop bots here to assign to {selectedUser.displayName}</p>
               </div>
+
               <div className="mt-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Upload .tsx bot file:
@@ -203,6 +276,38 @@ const AdminPanel: React.FC = () => {
                   onChange={handleTSXUpload}
                   className="block w-full border px-3 py-1 text-sm"
                 />
+              </div>
+
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-2">Summarized Chat Logs</h3>
+                {logs.map((log) => (
+                  <div key={log.id} className="border p-2 mb-2 rounded bg-gray-100 text-sm">
+                    <p className="mb-1 text-gray-700">
+                      {log.summary ? (
+                        <>
+                          <strong>Summary:</strong> {log.summary}
+                        </>
+                      ) : (
+                        <em>No summary yet.</em>
+                      )}
+                    </p>
+                    <button
+                      onClick={() => handleSummarizeLog(log)}
+                      className="text-blue-600 underline text-xs mt-1"
+                    >
+                      Generate Summary
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-6">
+                <button
+                  onClick={testSummarize}
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+                >
+                  Run Test Summarize
+                </button>
               </div>
             </div>
           ) : (

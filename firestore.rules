@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ✅ Admin check by email
+    function isAdmin() {
+      return request.auth != null &&
+             request.auth.token.email == "jacksoncgruber@gmail.com";
+    }
+
+    // ✅ Only specific UIDs can read their own /customBots document; only admin can write
+    match /customBots/{userId} {
+      allow read: if request.auth != null &&
+                   (request.auth.uid == "kxtsW15iqqdpolYa6vBDi3q63FB3" ||
+                    request.auth.uid == "Ch7CUUcBbWdY82ysxG3Mm9g83Nq1" ||
+                    request.auth.uid == "jedU5ZTNdoVCtJW1kjNxwNwi7eW2");
+      allow write: if isAdmin();
+    }
+
+    // ✅ Admin can read/write users
+    match /users/{userId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ✅ Only admin can read availableBots (can widen later if needed)
+    match /availableBots/{botId} {
+      allow read: if isAdmin();
+    }
+
+    // ✅ Allow user or admin to read bot config; only admin can write
+    match /bots/{userId}/bots/{botId} {
+      allow read: if request.auth != null && 
+                   (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // ✅ Logs: user can create/delete their own; admin can read and update
+    match /botLogs/{userId}/logs/{logId} {
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow read: if isAdmin();
+      allow update: if isAdmin(); // ✅ NEW: required for summarization to succeed
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ✅ Usage logs per bot per day
+    match /usageLogs/{userId}/{botId}/{date} {
+      allow read, write: if request.auth != null &&
+                         (request.auth.uid == "kxtsW15iqqdpolYa6vBDi3q63FB3" ||
+                          request.auth.uid == "Ch7CUUcBbWdY82ysxG3Mm9g83Nq1" ||
+                          request.auth.uid == "jedU5ZTNdoVCtJW1kjNxwNwi7eW2");
+    }
+
+    // ❌ Deny all others by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

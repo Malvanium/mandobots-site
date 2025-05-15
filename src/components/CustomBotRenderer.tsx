@@ -134,6 +134,7 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
         botId,
         timestamp: Timestamp.now(),
       });
+      // 🔁 Summarization intentionally omitted – admin-only feature
     } catch (err) {
       console.error("❌ Failed to save chat log:", err);
     }
@@ -236,17 +237,10 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
         <h2 className="text-xl font-bold mb-4">{config.name}</h2>
 
         <div className="mb-4">
-          <button
-            onClick={startNewChat}
-            className="text-sm text-blue-600 underline"
-          >
+          <button onClick={startNewChat} className="text-sm text-blue-600 underline">
             Start New Chat
           </button>
-
-          <button
-            onClick={clearChatHistory}
-            className="ml-4 text-sm text-red-600 underline"
-          >
+          <button onClick={clearChatHistory} className="ml-4 text-sm text-red-600 underline">
             Clear Chat History
           </button>
         </div>
@@ -274,7 +268,7 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
 
               const ref = doc(db, "bots", user.uid, "bots", botId);
               await setDoc(ref, { ...config, prompt: updatedPrompt });
-              setUploadMsg(`✅ Successfully uploaded and updated prompt from ${pendingFiles.length} file(s)`);
+              setUploadMsg(`✅ Successfully uploaded ${pendingFiles.length} file(s)`);
               setTimeout(() => setUploadMsg(null), 4000);
               setConfig({ ...config, prompt: updatedPrompt });
               setPendingFiles([]);
