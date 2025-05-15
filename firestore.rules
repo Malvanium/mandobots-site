@@ -34,11 +34,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ✅ Logs: user can create/delete their own; admin can read and update
+    // ✅ Logs: user can create/delete/read their own; admin can read/update
     match /botLogs/{userId}/logs/{logId} {
       allow create: if request.auth != null && request.auth.uid == userId;
-      allow read: if isAdmin();
-      allow update: if isAdmin(); // ✅ NEW: required for summarization to succeed
+      allow read: if request.auth != null && request.auth.uid == userId || isAdmin();
+      allow update: if isAdmin();
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 

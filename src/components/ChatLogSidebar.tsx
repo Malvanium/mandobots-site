@@ -1,12 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "../firebase";
-import {
-  collection,
-  getDocs,
-  query,
-  orderBy,
-  DocumentData,
-} from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
 
 interface Message {
@@ -21,32 +15,37 @@ interface ChatLogSidebarProps {
 
 export const ChatLogSidebar: React.FC<ChatLogSidebarProps> = ({ botId, onSelect }) => {
   const [user] = useAuthState(auth);
-  const [logs, setLogs] = useState<DocumentData[]>([]);
+  const [logs, setLogs] = useState<{ messages: Message[]; timestamp?: any }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showMobile, setShowMobile] = useState(false); // <-- Toggle for mobile
+  const [showMobile, setShowMobile] = useState(false);
 
   useEffect(() => {
     if (!user) return;
 
-    const fetchLogs = async () => {
+    const fetchSingleLog = async () => {
       try {
-        const ref = collection(db, "botLogs", user.uid, "logs");
-        const q = query(ref, orderBy("timestamp", "desc"));
-        const snapshot = await getDocs(q);
+        const ref = doc(db, "botLogs", user.uid, "logs", botId);
+        const snap = await getDoc(ref);
 
-        const botLogs = snapshot.docs
-          .map((doc) => doc.data())
-          .filter((log) => log.botId === botId && Array.isArray(log.messages));
-
-        setLogs(botLogs);
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.botId === botId && Array.isArray(data.messages)) {
+            setLogs([{ messages: data.messages, timestamp: data.updatedAt }]);
+          } else {
+            setLogs([]);
+          }
+        } else {
+          setLogs([]);
+        }
       } catch (err) {
-        console.error("❌ Failed to load chat logs:", err);
+        console.error("❌ Failed to load chat log:", err);
+        setLogs([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchLogs();
+    fetchSingleLog();
   }, [user, botId]);
 
   return (
@@ -76,7 +75,9 @@ export const ChatLogSidebar: React.FC<ChatLogSidebarProps> = ({ botId, onSelect 
         <ul className="space-y-2">
           {logs.map((log, index) => {
             const preview =
-              log.messages?.find((m: Message) => m.role === "user")?.content || "Unnamed";
+              log.messages?.find((m: Message) => m.role === "user")?.content ||
+              log.messages?.[0]?.content ||
+              "Unnamed";
             const ts =
               log.timestamp?.toDate?.().toLocaleString?.() || `Chat ${index + 1}`;
             return (

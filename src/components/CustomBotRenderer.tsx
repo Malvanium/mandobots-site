@@ -129,12 +129,22 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
   const saveChatLog = async (messagesToSave: Message[]) => {
     if (!user) return;
     try {
-      await addDoc(collection(db, "botLogs", user.uid, "logs"), {
-        messages: messagesToSave,
-        botId,
-        timestamp: Timestamp.now(),
-      });
-      // 🔁 Summarization intentionally omitted – admin-only feature
+      const logRef = doc(db, "botLogs", user.uid, "logs", botId);
+      const snap = await getDoc(logRef);
+      if (!snap.exists()) {
+        await setDoc(logRef, {
+          botId,
+          messages: messagesToSave,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+      } else {
+        await setDoc(logRef, {
+          botId,
+          messages: messagesToSave,
+          updatedAt: Timestamp.now(),
+        }, { merge: true });
+      }
     } catch (err) {
       console.error("❌ Failed to save chat log:", err);
     }
