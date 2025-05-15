@@ -1,26 +1,37 @@
 import React, { useEffect, useState, ChangeEvent } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../firebase";
+import pdfjsLib from "../pdf"; // ✅ uses preconfigured version
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.entry"; // ✅ worker import
 import {
   doc,
   getDoc,
   setDoc,
   collection,
   Timestamp,
-  addDoc,
   getDocs,
   query,
-  orderBy,
   where,
   deleteDoc,
+  updateDoc,
 } from "firebase/firestore";
-import * as pdfjsLib from "pdfjs-dist";
 import mammoth from "mammoth";
 import { ChatLogSidebar } from "./ChatLogSidebar";
+import { validateTransaction } from "../utils/validateTransaction";
+
+// ✅ Now safe: after all imports
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+}
+
+interface UploadedFile {
+  fileName: string;
+  content: string;
+  uploadedAt: Timestamp;
 }
 
 interface BotConfig {
@@ -33,23 +44,36 @@ interface BotConfig {
 export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
   const [user] = useAuthState(auth);
   const [config, setConfig] = useState<BotConfig | null>(null);
+  const [memory, setMemory] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const [permissionError, setPermissionError] = useState<boolean>(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   useEffect(() => {
     if (!user) return;
 
-    const loadConfig = async () => {
+    const loadData = async () => {
       try {
-        const ref = doc(db, "bots", user.uid, "bots", botId);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          const data = snap.data() as BotConfig;
+        const configRef = doc(db, "bots", user.uid, "bots", botId);
+        const configSnap = await getDoc(configRef);
+        const memoryRef = doc(db, "botMemory", user.uid, "bots", botId);
+        const memorySnap = await getDoc(memoryRef);
+
+        if (memorySnap.exists()) {
+          const mem = memorySnap.data();
+          setMemory(mem);
+          if (Array.isArray(mem.uploadedFiles)) {
+            setUploadedFiles(mem.uploadedFiles);
+          }
+        }
+
+        if (configSnap.exists()) {
+          const data = configSnap.data() as BotConfig;
           setConfig(data);
           setMessages([
             {
@@ -68,8 +92,9 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
     const checkUsage = async () => {
       try {
         const today = new Date().toISOString().split("T")[0];
-        const usageRef = doc(db, "usageLogs", user.uid, botId, today);
+        const usageRef = doc(db, "usageLogs", user!.uid, botId, today);
         const snap = await getDoc(usageRef);
+
         if (snap.exists()) {
           const count = snap.data().count || 0;
           if (count >= (config?.usageLimit || 50)) setLimitReached(true);
@@ -79,7 +104,7 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
       }
     };
 
-    loadConfig();
+    loadData();
     checkUsage();
   }, [user, botId]);
 
@@ -90,6 +115,108 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
     const count = snap.exists() ? snap.data().count || 0 : 0;
     await setDoc(usageRef, { count: count + 1, lastUsed: Timestamp.now() });
     if (count + 1 >= (config?.usageLimit || 50)) setLimitReached(true);
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() || !config || limitReached) return;
+
+    const newMessages: Message[] = [...messages, { role: "user", content: input }];
+    setMessages(newMessages);
+    setInput("");
+    setLoading(true);
+
+    const match = input.match(/(?:log|record)\s+\$?(\d+(?:\.\d{1,2})?)\s+(?:expense|income)?\s*(?:to|from)?\s*(\w+)/i);
+
+    if (match && memory) {
+      const amount = parseFloat(match[1]);
+      const vendor = match[2];
+      const validation = validateTransaction(vendor, memory);
+
+      const validationMsg = validation.errors.length
+        ? `⚠️ Issues:\n- ${validation.errors.join("\n- ")}`
+        : `✅ Auto-tagged to category "${validation.category}"`;
+
+      const annotated: Message[] = [
+        ...messages,
+        { role: "user", content: input },
+        { role: "assistant", content: validationMsg },
+      ];
+      setMessages(annotated);
+      await saveChatLog(annotated);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      
+      const systemContent = memory
+        ? `Persistent memory:\n${JSON.stringify(memory, null, 2)}\n\n${config.prompt}`
+        : config.prompt;
+
+      const res = await fetch(process.env.REACT_APP_CHAT_ENDPOINT || "", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: systemContent },
+            ...newMessages.slice(-6),
+          ],
+          temperature: 0.7,
+          max_tokens: 400,
+        }),
+      });
+
+      const data = await res.json();
+      const reply = data.choices?.[0]?.message?.content || "(No response)";
+      const fullMessages: Message[] = [...newMessages, { role: "assistant", content: reply }];
+      setMessages(fullMessages);
+      await updateUsage();
+      await saveChatLog(fullMessages);
+    } catch (err) {
+      setMessages([
+        ...newMessages,
+        { role: "assistant", content: "⚠️ API error." },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveChatLog = async (messagesToSave: Message[]) => {
+    if (!user) return;
+    try {
+      const logRef = doc(db, "botLogs", user.uid, "logs", botId);
+      await setDoc(
+        logRef,
+        {
+          botId,
+          messages: messagesToSave,
+          updatedAt: Timestamp.now(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error("❌ Failed to save chat log:", err);
+    }
+  };
+
+  const updateMemoryFiles = async (files: UploadedFile[]) => {
+    if (!user) return;
+    const ref = doc(db, "botMemory", user.uid, "bots", botId);
+    await updateDoc(ref, { uploadedFiles: files });
+    setUploadedFiles(files);
+  };
+  const handleDeleteFile = async (fileName: string) => {
+    const updated = uploadedFiles.filter((f) => f.fileName !== fileName);
+    await updateMemoryFiles(updated);
+  };  
+
+  const handleReplaceFile = (fileName: string) => {
+    alert(`To replace "${fileName}", reupload a new file with the same name.`);
   };
 
   const extractTextFromFile = async (file: File): Promise<string> => {
@@ -126,76 +253,6 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
     return Promise.resolve("");
   };
 
-  const saveChatLog = async (messagesToSave: Message[]) => {
-    if (!user) return;
-    try {
-      const logRef = doc(db, "botLogs", user.uid, "logs", botId);
-      const snap = await getDoc(logRef);
-      if (!snap.exists()) {
-        await setDoc(logRef, {
-          botId,
-          messages: messagesToSave,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        });
-      } else {
-        await setDoc(logRef, {
-          botId,
-          messages: messagesToSave,
-          updatedAt: Timestamp.now(),
-        }, { merge: true });
-      }
-    } catch (err) {
-      console.error("❌ Failed to save chat log:", err);
-    }
-  };
-
-  const handleSend = async () => {
-    if (!input.trim() || !config || limitReached) return;
-
-    const newMessages: Message[] = [...messages, { role: "user", content: input }];
-    setMessages(newMessages);
-    setInput("");
-    setLoading(true);
-
-    try {
-      const res = await fetch(process.env.REACT_APP_CHAT_ENDPOINT || "", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [
-            { role: "system", content: config.prompt },
-            ...newMessages.slice(-6),
-          ],
-          temperature: 0.7,
-          max_tokens: 400,
-        }),
-      });
-
-      const data = await res.json();
-      const reply = data.choices?.[0]?.message?.content || "(No response)";
-      const fullMessages: Message[] = [...newMessages, { role: "assistant", content: reply }];
-      setMessages(fullMessages);
-      await updateUsage();
-      await saveChatLog(fullMessages);
-    } catch (err) {
-      setMessages([
-        ...newMessages,
-        { role: "assistant", content: "⚠️ API error." },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSelectLog = (logMessages: Message[]) => {
-    setMessages(logMessages);
-  };
-
   const startNewChat = () => {
     if (!config) return;
     setMessages([
@@ -220,6 +277,47 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
     }
   };
 
+  const renderUploadedFiles = () => {
+    if (!uploadedFiles.length) return null;
+    return (
+      <div className="mt-6 border-t pt-4">
+        <h3 className="text-md font-semibold mb-2">Uploaded Files</h3>
+        <ul className="space-y-3">
+          {uploadedFiles.map((file) => (
+            <li key={file.fileName} className="bg-white p-3 rounded border shadow-sm">
+              <div className="flex justify-between items-center flex-wrap">
+                <div>
+                  <p className="font-medium text-sm">{file.fileName}</p>
+                  <p className="text-xs text-gray-500">
+                    Uploaded: {file.uploadedAt.toDate().toLocaleString()}
+                  </p>
+                </div>
+                <div className="flex gap-2 mt-2 md:mt-0">
+                  <button
+                    onClick={() => handleReplaceFile(file.fileName)}
+                    className="text-blue-600 text-xs underline"
+                  >
+                    Replace
+                  </button>
+                  <button
+                    onClick={() => handleDeleteFile(file.fileName)}
+                    className="text-red-600 text-xs underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600 mt-2 max-h-16 overflow-hidden">
+                {file.content.slice(0, 200)}
+                {file.content.length > 200 && "..."}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+
   if (!user) return <p>Please log in to use this bot.</p>;
   if (permissionError) {
     return (
@@ -240,7 +338,7 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
   return (
     <div className="flex flex-col md:flex-row">
       <div className="md:w-1/4 w-full border-b md:border-b-0 md:border-r">
-        <ChatLogSidebar botId={botId} onSelect={handleSelectLog} />
+        <ChatLogSidebar botId={botId} onSelect={(logMessages) => setMessages(logMessages)} />
       </div>
 
       <div className="flex-1 p-4">
@@ -270,14 +368,45 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
             onClick={async () => {
               if (!pendingFiles.length || !user || !config) return;
 
-              let updatedPrompt = config.prompt;
-              for (const file of pendingFiles) {
-                const text = await extractTextFromFile(file);
-                updatedPrompt += `\n\nUploaded Content from ${file.name}:\n${text}`;
-              }
+              const newFiles: UploadedFile[] = [];
 
-              const ref = doc(db, "bots", user.uid, "bots", botId);
-              await setDoc(ref, { ...config, prompt: updatedPrompt });
+let updatedPrompt = config.prompt;
+
+for (const file of pendingFiles) {
+  const text = await extractTextFromFile(file);
+
+  // update both memory + prompt
+  newFiles.push({
+    fileName: file.name,
+    content: text,
+    uploadedAt: Timestamp.now(),
+  });
+
+  updatedPrompt += `\n\nUploaded Content from ${file.name}:\n${text}`;
+}
+
+const combined = [
+  ...uploadedFiles.filter((f) => !newFiles.some((n) => n.fileName === f.fileName)),
+  ...newFiles,
+];
+
+// update Firestore memory
+const memRef = doc(db, "botMemory", user.uid, "bots", botId);
+await setDoc(memRef, { uploadedFiles: combined }, { merge: true });
+
+setUploadedFiles(combined);
+setUploadMsg(`✅ Successfully uploaded ${newFiles.length} file(s)`);
+setTimeout(() => setUploadMsg(null), 4000);
+setPendingFiles([]);
+
+const configRef = doc(db, "bots", user.uid, "bots", botId);
+await setDoc(configRef, { ...config, prompt: updatedPrompt });
+setConfig({ ...config, prompt: updatedPrompt });
+
+
+
+              const botConfigRef = doc(db, "bots", user.uid, "bots", botId);
+              await setDoc(botConfigRef, { ...config, prompt: updatedPrompt });
               setUploadMsg(`✅ Successfully uploaded ${pendingFiles.length} file(s)`);
               setTimeout(() => setUploadMsg(null), 4000);
               setConfig({ ...config, prompt: updatedPrompt });
@@ -288,6 +417,7 @@ export const CustomBotRenderer: React.FC<{ botId: string }> = ({ botId }) => {
             Upload Files
           </button>
           {uploadMsg && <p className="text-green-600 mt-2 text-sm">{uploadMsg}</p>}
+          {renderUploadedFiles()}
         </div>
 
         <div className="border p-4 h-[60vh] overflow-y-auto bg-gray-50 rounded mb-4">
